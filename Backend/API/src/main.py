@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 import uvicorn
 
 from src.core.database import Base, engine
@@ -22,7 +23,8 @@ app.include_router(workout_exercise.router)
 app.include_router(workout.router)
 app.include_router(set.router)
 
-origins = ["http://localhost:3000"]
+
+origins = ["http://localhost:3000", "https://stacked-n-jacked.wojtek.s.solvro.pl"]
 
 app.add_middleware(
     CORSMiddleware,
@@ -31,6 +33,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*.wojtek.s.solvro.pl", "localhost"])
 
 
 @app.get("/")

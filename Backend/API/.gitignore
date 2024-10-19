@@ -47,4 +47,5 @@ htmlcov/
 #Other
 Gym Exercises Dataset.xlsx
 GymPlannerDatabase schema.png
-alembic.ini
+exercises.csv
+Docker-compose.yml

@@ -1,11 +1,21 @@
+import datetime
 import re
 
-from pydantic import BaseModel, HttpUrl, Field, field_validator
+from pydantic import HttpUrl, Field, field_validator
+from src.schemas.base_schema import BaseSchema
 
 
-class Exercise(BaseModel):
+class ExerciseBase(BaseSchema):
     id: int
     name: str
+
+
+class ExerciseLatest(BaseSchema):
+    id: int
+    workout_date: datetime.date
+
+
+class Exercise(ExerciseBase):
     target_muscle: str
     equipment: str | None = None
     youtube_url: HttpUrl | None = Field(default=None, description="URL to Youtube video tutorial for an exercise",

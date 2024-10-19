@@ -8,14 +8,15 @@ import src.crud.workout_exercise as workout_exercise_service
 import src.crud.set as set_service
 from src.schemas.user import User
 from src.schemas.workout_exercise import WorkoutExercise, WorkoutExerciseBase, \
-    WorkoutExerciseUpdate
+    WorkoutExerciseUpdate, WorkoutExerciseDetailsChart
+from src.schemas.exercise import ExerciseBase, Exercise, ExerciseLatest
 from src.schemas.set import Set
 from src.core.dependencies import get_db, get_current_user
 
 router = APIRouter(prefix="/workout_exercises", tags=["Workout Exercise"])
 
 
-@router.post("", status_code=status.HTTP_201_CREATED, response_model=WorkoutExerciseBase)
+@router.post("", status_code=status.HTTP_201_CREATED, response_model=WorkoutExercise)
 def create_workout_exercise(current_user: Annotated[User, Depends(get_current_user)],
                             workout_exercise_base: WorkoutExerciseBase, db: Session = Depends(get_db)):
     if not exercise_service.get_exercise_by_id(db, workout_exercise_base.exercise_id):
@@ -33,6 +34,59 @@ def create_workout_exercise(current_user: Annotated[User, Depends(get_current_us
         )
 
     return workout_exercise_service.create_workout_exercise(db, workout_exercise_base)
+
+
+@router.get("", response_model=list[WorkoutExercise])
+def get_workout_exercises(current_user: Annotated[User, Depends(get_current_user)],
+                          db: Session = Depends(get_db)):
+    return workout_exercise_service.get_workout_exercises_by_user_id(db, current_user.id)
+
+
+@router.get("/exercises", response_model=list[ExerciseBase])
+def get_exercises_from_workout_exercises(current_user: Annotated[User, Depends(get_current_user)],
+                                         db: Session = Depends(get_db)):
+    return workout_exercise_service.get_exercises_from_workout_exercises(db, current_user.id)
+
+
+@router.get("/exercises/latest", response_model=list[Exercise])
+def get_latest_exercises_from_workout_exercises(current_user: Annotated[User, Depends(get_current_user)],
+                                                db: Session = Depends(get_db)):
+    #it's complicated logic so I will leave many comments there
+
+    #get all exercises (with duplicates) from db based on user workout exercises and convert it to ExerciseLatest(id, workout_date)
+    latest_exercises = [ExerciseLatest(id=ex.exercise_id, workout_date=ex.workout.workout_date) for ex in
+                        workout_exercise_service.get_latest_exercises(db, current_user.id)]
+
+    #get all exercises from db
+    exercises = exercise_service.get_exercises(db, limit=500)
+
+    #get only latest exercise (unique values) with latest date - I'm not sure if it works in all cases
+    unique_exercises = {
+        ex.id: ex for ex in latest_exercises
+    }
+
+    #convert from dict to list
+    latest_exercises = list(unique_exercises.values())
+
+    #auxiliary list of ids
+    latest_exercises_id = [e.id for e in latest_exercises]
+
+    #return sorted list of exercises
+    return sorted(exercises, key=lambda ex: ex.id in latest_exercises_id, reverse=True)
+
+
+@router.get("/exercises/{id}", response_model=list[WorkoutExerciseDetailsChart], response_model_exclude_none=True)
+def get_workout_exercises_by_exercise(current_user: Annotated[User, Depends(get_current_user)],
+                                      id: Annotated[int, Path()],
+                                      db: Session = Depends(get_db)):
+    exs = workout_exercise_service.get_workout_exercises_by_exercise_id(db, current_user.id, id)
+    result = [WorkoutExerciseDetailsChart(
+        id=ex.id,
+        sets=ex.sets,
+        workout_date=ex.workout.workout_date,
+    )
+        for ex in exs]
+    return result
 
 
 @router.get("/{workout_exercise_id}", response_model=WorkoutExercise)
@@ -55,15 +109,6 @@ def get_sets_by_workout_exercise_id(current_user: Annotated[User, Depends(get_cu
         raise HTTPException(status_code=404, detail="Workout exercise not found")
 
     return set_service.get_sets_in_workout_exercise(db, workout_exercise_id)
-
-
-# TODO should this endpoint be there or in sets router, think about getting sets by exercise (NOT WORKOUT_EXERCISE)^^^
-
-
-@router.get("", response_model=list[WorkoutExercise])
-def get_workout_exercises(current_user: Annotated[User, Depends(get_current_user)],
-                          db: Session = Depends(get_db)):
-    return workout_exercise_service.get_workout_exercises_by_user_id(db, current_user.id)
 
 
 @router.patch("", response_model=WorkoutExercise)
